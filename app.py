@@ -98,96 +98,6 @@ def confirmacao_html(nome, codigo, quantidade):
     </html>
     """
 
-@app.route("/relatorio")
-def relatorio():
-    termo = request.args.get("busca", "").strip()
-    if termo:
-        cursor.execute("SELECT codigo, nome, quantidade FROM produtos WHERE nome LIKE ? OR codigo LIKE ?", (f"%{termo}%", f"%{termo}%"))
-    else:
-        cursor.execute("SELECT codigo, nome, quantidade FROM produtos")
-    
-    produtos = cursor.fetchall()
-    linhas = "".join(f"<tr><td>{codigo}</td><td>{nome}</td><td>{quantidade}</td></tr>" for codigo, nome, quantidade in produtos)
-
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Relatório</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head>
-    <body class="container py-4">
-        <h2>📊 Relatório de Estoque</h2>
-        <form method="GET" class="row g-3 mb-4">
-            <div class="col-md-6">
-                <input type="text" name="busca" class="form-control" placeholder="🔍 Buscar por nome ou código" value="{termo}">
-            </div>
-            <div class="col-md-6">
-                <button type="submit" class="btn btn-outline-primary">Buscar</button>
-                <a href="/relatorio" class="btn btn-link">Limpar</a>
-            </div>
-        </form>
-        <table class="table table-striped">
-            <thead><tr><th>Código</th><th>Nome</th><th>Quantidade</th></tr></thead>
-            <tbody>{linhas}</tbody>
-        </table>
-        <p>
-            <a href="/export/csv" class="btn btn-outline-secondary me-2">⬇️ Exportar CSV</a>
-            <a href="/export/xlsx" class="btn btn-outline-secondary">⬇️ Exportar XLSX</a>
-        </p>
-        <a href="/cadastro" class="btn btn-link">← Voltar ao cadastro</a>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
-
-@app.route("/baixa", methods=["GET", "POST"])
-def baixa():
-    mensagem = ""
-    if request.method == "POST":
-        codigo = request.form.get("codigo", "").strip()
-        cursor.execute("SELECT nome, quantidade FROM produtos WHERE codigo = ?", (codigo,))
-        resultado = cursor.fetchone()
-        if resultado:
-            nome, quantidade = resultado
-            if quantidade > 0:
-                nova_qtd = quantidade - 1
-                cursor.execute("UPDATE produtos SET quantidade = ? WHERE codigo = ?", (nova_qtd, codigo))
-                conn.commit()
-                mensagem = f"🟢 Baixa realizada: {nome} agora tem {nova_qtd} unidades."
-            else:
-                mensagem = f"⚠️ Estoque zerado: {nome} não possui unidades disponíveis."
-        else:
-            mensagem = "❌ Produto não encontrado."
-
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Baixa de Estoque</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head>
-    <body class="container py-4">
-        <h2>📦 Registrar Saída de Produto</h2>
-        <form method="POST" class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label">Código do produto:</label>
-                <input type="text" name="codigo" class="form-control" required>
-            </div>
-            <div class="col-md-6 align-self-end">
-                <button type="submit" class="btn btn-danger">Registrar Baixa</button>
-            </div>
-        </form>
-        <div class="mt-4 fw-bold">{mensagem}</div>
-        <hr>
-        <a href="/cadastro" class="btn btn-outline-primary me-2">← Voltar ao Cadastro</a>
-        <a href="/relatorio" class="btn btn-outline-secondary">📊 Ver Relatório</a>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
-
-
 @app.route("/scanner", methods=["GET", "POST"])
 def scanner():
     mensagem = ""
@@ -221,104 +131,80 @@ def scanner():
     <html>
     <head>
         <title>Escaneamento com Câmera</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+        <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
+        <script src='https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'></script>
     </head>
-    <body class="container py-4 text-center">
+    <body class='container py-4 text-center'>
         <h2>📲 Escaneamento com Câmera</h2>
-        <form id="operacao-form" class="mb-3">
-            <div class="btn-group" role="group">
-                <input type="radio" class="btn-check" name="operacao" id="entrada" value="entrada" autocomplete="off" checked>
-                <label class="btn btn-outline-success" for="entrada">Entrada</label>
+        <form id='operacao-form' class='mb-3'>
+            <div class='btn-group' role='group'>
+                <input type='radio' class='btn-check' name='operacao' id='entrada' value='entrada' autocomplete='off' checked>
+                <label class='btn btn-outline-success' for='entrada'>Entrada</label>
 
-                <input type="radio" class="btn-check" name="operacao" id="saida" value="saida" autocomplete="off">
-                <label class="btn btn-outline-danger" for="saida">Saída</label>
+                <input type='radio' class='btn-check' name='operacao' id='saida' value='saida' autocomplete='off'>
+                <label class='btn btn-outline-danger' for='saida'>Saída</label>
             </div>
         </form>
-        <video id="preview" class="border mb-3" style="width:100%; max-width:400px;"></video>
-        <p id="msg" class="fw-bold">{mensagem}</p>
+
+        <video id='preview' autoplay playsinline style='width:100%; max-width:480px;' class='border mb-3'></video>
+        <p id='msg' class='fw-bold'>{mensagem}</p>
 
         <script>
-document.addEventListener("DOMContentLoaded", function () {
-    let operacaoAtual = "entrada";
+        document.addEventListener("DOMContentLoaded", function () {
+            let operacaoAtual = "entrada";
 
-    document.querySelectorAll("input[name='operacao']").forEach(el => {
-        el.addEventListener("change", () => {
-            operacaoAtual = document.querySelector("input[name='operacao']:checked").value;
+            document.querySelectorAll("input[name='operacao']").forEach(el => {
+                el.addEventListener("change", () => {
+                    operacaoAtual = document.querySelector("input[name='operacao']:checked").value;
+                });
+            });
+
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#preview'),
+                    constraints: {
+                        facingMode: "environment",
+                        width: 640,
+                        height: 480
+                    }
+                },
+                decoder: {
+                    readers: ["code_128_reader"]
+                },
+                locate: true
+            }, function (err) {
+                if (err) {
+                    console.error("Erro ao iniciar o Quagga:", err);
+                    document.getElementById("msg").innerText = "Erro: " + err;
+                    return;
+                }
+                console.log("Quagga iniciado.");
+                Quagga.start();
+            });
+
+            Quagga.onDetected(function (data) {
+                let codigo = data.codeResult.code;
+                console.log("Detectado:", codigo);
+                Quagga.stop();
+
+                fetch("/scanner", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: "codigo=" + codigo + "&operacao=" + operacaoAtual
+                }).then(res => res.text()).then(html => {
+                    document.open();
+                    document.write(html);
+                    document.close();
+                });
+            });
         });
-    });
-
-    Quagga.init({
-        inputStream: {
-            name: "Live",
-            type: "LiveStream",
-            target: document.querySelector('#preview'),
-            constraints: {
-                width: 640,
-                height: 480,
-                facingMode: "environment" // "user" para notebook/câmera frontal
-            }
-        },
-        decoder: {
-            readers: ["code_128_reader"]
-        },
-        locate: true
-    }, function (err) {
-        if (err) {
-            console.error("Erro ao iniciar o Quagga:", err);
-            document.getElementById("msg").innerText = "Erro ao iniciar o scanner: " + err;
-            return;
-        }
-        console.log("Quagga iniciado com sucesso.");
-        Quagga.start();
-    });
-
-    Quagga.onDetected(function (data) {
-        let codigo = data.codeResult.code;
-        console.log("Código detectado:", codigo);
-        Quagga.stop();
-
-        fetch("/scanner", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: "codigo=" + codigo + "&operacao=" + operacaoAtual
-        }).then(res => res.text()).then(html => {
-            document.open();
-            document.write(html);
-            document.close();
-        });
-    });
-});
-</script>
-
+        </script>
     </body>
     </html>
     """
     return render_template_string(html)
-
-
-@app.route("/export/csv")
-def export_csv():
-    cursor.execute("SELECT codigo, nome, quantidade FROM produtos")
-    df = pd.DataFrame(cursor.fetchall(), columns=["Código", "Nome", "Quantidade"])
-    output = BytesIO()
-    df.to_csv(output, index=False)
-    output.seek(0)
-    return send_file(output, mimetype="text/csv", download_name="estoque.csv", as_attachment=True)
-
-@app.route("/export/xlsx")
-def export_xlsx():
-    cursor.execute("SELECT codigo, nome, quantidade FROM produtos")
-    df = pd.DataFrame(cursor.fetchall(), columns=["Código", "Nome", "Quantidade"])
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Estoque")
-    output.seek(0)
-    return send_file(output,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        download_name="estoque.xlsx", as_attachment=True)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
