@@ -239,49 +239,60 @@ def scanner():
         <p id="msg" class="fw-bold">{mensagem}</p>
 
         <script>
-        let operacaoAtual = "entrada";
+document.addEventListener("DOMContentLoaded", function () {
+    let operacaoAtual = "entrada";
 
-        document.querySelectorAll("input[name='operacao']").forEach(el => {{
-            el.addEventListener("change", () => {{
-                operacaoAtual = document.querySelector("input[name='operacao']:checked").value;
-            }});
-        }});
+    document.querySelectorAll("input[name='operacao']").forEach(el => {
+        el.addEventListener("change", () => {
+            operacaoAtual = document.querySelector("input[name='operacao']:checked").value;
+        });
+    });
 
-        function iniciarScanner() {{
-            Quagga.init({{
-                inputStream: {{
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#preview'),
-                    constraints: {{ facingMode: "environment" }}
-                }},
-                decoder: {{ readers: ["code_128_reader"] }}
-            }}, function(err) {{
-                if (err) {{
-                    document.getElementById("msg").innerText = "Erro ao acessar a câmera: " + err;
-                    return;
-                }}
-                Quagga.start();
-            }});
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.querySelector('#preview'),
+            constraints: {
+                width: 640,
+                height: 480,
+                facingMode: "environment" // "user" para notebook/câmera frontal
+            }
+        },
+        decoder: {
+            readers: ["code_128_reader"]
+        },
+        locate: true
+    }, function (err) {
+        if (err) {
+            console.error("Erro ao iniciar o Quagga:", err);
+            document.getElementById("msg").innerText = "Erro ao iniciar o scanner: " + err;
+            return;
+        }
+        console.log("Quagga iniciado com sucesso.");
+        Quagga.start();
+    });
 
-            Quagga.onDetected(function(data) {{
-                let codigo = data.codeResult.code;
-                Quagga.stop();
+    Quagga.onDetected(function (data) {
+        let codigo = data.codeResult.code;
+        console.log("Código detectado:", codigo);
+        Quagga.stop();
 
-                fetch("/scanner", {{
-                    method: "POST",
-                    headers: {{ "Content-Type": "application/x-www-form-urlencoded" }},
-                    body: "codigo=" + codigo + "&operacao=" + operacaoAtual
-                }}).then(res => res.text()).then(html => {{
-                    document.open();
-                    document.write(html);
-                    document.close();
-                }});
-            }});
-        }}
+        fetch("/scanner", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "codigo=" + codigo + "&operacao=" + operacaoAtual
+        }).then(res => res.text()).then(html => {
+            document.open();
+            document.write(html);
+            document.close();
+        });
+    });
+});
+</script>
 
-        iniciarScanner();
-        </script>
     </body>
     </html>
     """
